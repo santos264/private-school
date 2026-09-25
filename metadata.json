@@ -1,0 +1,6 @@
+{
+  "name": "AcademiaSync - Secondary School Management System",
+  "description": "Comprehensive web-based secondary school management system featuring student & staff records, attendance register, automated continuous assessment & exam grading, terminal report cards, school fees ledger, timetables, announcements, and role-based portals for administrators, teachers, students, and parents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
