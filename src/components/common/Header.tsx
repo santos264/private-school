@@ -3,19 +3,27 @@ import { useSchool } from '../../context/SchoolContext';
 import { 
   Users, 
   Bell, 
-  RotateCcw,
-  School,
-  Sparkles
+  RotateCcw, 
+  School, 
+  Sparkles, 
+  LogOut, 
+  LogIn,
+  KeyRound,
+  Database 
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { 
     currentUser, 
+    isAuthenticated,
     settings, 
     setIsRoleSwitcherOpen, 
     resetToDefaultData, 
     announcements,
-    setCurrentView
+    currentView,
+    setCurrentView,
+    logout,
+    openLoginPortal
   } = useSchool();
 
   const roleLabels: Record<string, string> = {
@@ -91,8 +99,33 @@ export const Header: React.FC = () => {
         </button>
       </nav>
 
-      {/* Zone 3: Primary Actions - Role Switcher & Active Profile */}
+      {/* Zone 3: Primary Actions - Login Place, Role Switcher & Active Profile */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Prominent Header Login Place */}
+        <button
+          onClick={() => openLoginPortal()}
+          className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-bold text-white bg-linear-to-r from-indigo-600 via-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 active:from-indigo-700 active:to-blue-700 rounded-xl shadow-xs hover:shadow-sm transition-all border border-indigo-400/30 group cursor-pointer"
+          title="Go to Login Portal to log in as Staff or Student"
+        >
+          <LogIn className="w-4 h-4 text-indigo-200 group-hover:text-white transition-colors" />
+          <span className="tracking-wide">Login</span>
+          <span className="hidden sm:inline-block text-[10px] bg-white/20 text-white px-1.5 py-0.5 rounded font-medium">
+            Staff & Student
+          </span>
+        </button>
+
+        {/* Demo Roles Shortcut (available when unauthenticated for fast exploration) */}
+        {!isAuthenticated && (
+          <button
+            onClick={() => setIsRoleSwitcherOpen(true)}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-all text-xs font-medium text-slate-600 cursor-pointer"
+            title="Instant Demo Role Access"
+          >
+            <Users className="w-3.5 h-3.5 text-slate-500" />
+            <span>Demo Roles</span>
+          </button>
+        )}
+
         <button
           onClick={() => {
             if (window.confirm('Reset all demo data back to default initial state?')) {
@@ -100,14 +133,14 @@ export const Header: React.FC = () => {
             }
           }}
           title="Reset demo data"
-          className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
         >
           <RotateCcw className="w-4 h-4" />
         </button>
 
         <button
           onClick={() => setCurrentView('notices')}
-          className="relative p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+          className="relative p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
           title="View Announcements"
         >
           <Bell className="w-4 h-4" />
@@ -116,31 +149,49 @@ export const Header: React.FC = () => {
           )}
         </button>
 
-        {/* Role Switcher Pill/Button */}
-        <button
-          onClick={() => setIsRoleSwitcherOpen(true)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-all text-left group"
-        >
-          <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-300">
-            <img 
-              src={currentUser.avatarUrl} 
-              alt={currentUser.name} 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-          <div className="hidden sm:block text-left">
-            <p className="text-xs font-semibold text-slate-800 leading-tight group-hover:text-indigo-600 transition-colors">
-              {currentUser.name}
-            </p>
-            <p className="text-[11px] text-slate-500 capitalize">
-              {roleLabels[currentUser.role]}
-            </p>
-          </div>
-          <span className="ml-1 text-slate-400 group-hover:text-slate-700 transition-colors">
-            <Users className="w-3.5 h-3.5" />
-          </span>
-        </button>
+        {/* Role Switcher Pill/Button (shown when authenticated) */}
+        {isAuthenticated && (
+          <button
+            onClick={() => setIsRoleSwitcherOpen(true)}
+            className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 transition-all text-left group cursor-pointer"
+            title="Quick Persona Switcher"
+          >
+            <div className="w-7 h-7 rounded-full bg-slate-200 overflow-hidden shrink-0 border border-slate-300">
+              <img 
+                src={currentUser.avatarUrl} 
+                alt={currentUser.name} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div className="hidden sm:block text-left">
+              <p className="text-xs font-semibold text-slate-800 leading-tight group-hover:text-indigo-600 transition-colors">
+                {currentUser.name}
+              </p>
+              <p className="text-[11px] text-slate-500 capitalize">
+                {roleLabels[currentUser.role]}
+              </p>
+            </div>
+            <span className="ml-1 text-slate-400 group-hover:text-slate-700 transition-colors">
+              <Users className="w-3.5 h-3.5" />
+            </span>
+          </button>
+        )}
+
+        {/* Log Out button (shown when authenticated) */}
+        {isAuthenticated && (
+          <button
+            onClick={() => {
+              logout();
+              setCurrentView('dashboard');
+            }}
+            title="Log out and return to default school view"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-white bg-rose-50 hover:bg-rose-600 border border-rose-200 hover:border-rose-600 rounded-lg transition-all cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Log Out</span>
+          </button>
+        )}
       </div>
     </header>
   );

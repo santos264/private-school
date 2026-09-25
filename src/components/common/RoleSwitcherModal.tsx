@@ -5,7 +5,7 @@ import { UserRole } from '../../types';
 import { X, Check, ShieldCheck, GraduationCap, Users2, UserCheck, WalletCards } from 'lucide-react';
 
 export const RoleSwitcherModal: React.FC = () => {
-  const { isRoleSwitcherOpen, setIsRoleSwitcherOpen, currentUser, setCurrentUser, setCurrentView } = useSchool();
+  const { isRoleSwitcherOpen, setIsRoleSwitcherOpen, currentUser, loginAsUser, setCurrentView } = useSchool();
 
   if (!isRoleSwitcherOpen) return null;
 
@@ -18,7 +18,7 @@ export const RoleSwitcherModal: React.FC = () => {
   };
 
   const handleSelectUser = (user: typeof DEMO_USERS[0]) => {
-    setCurrentUser(user);
+    loginAsUser(user);
     setCurrentView('dashboard');
     setIsRoleSwitcherOpen(false);
   };
@@ -47,7 +47,7 @@ export const RoleSwitcherModal: React.FC = () => {
         {/* User Persona List */}
         <div className="p-4 space-y-2.5 max-h-[70vh] overflow-y-auto">
           {DEMO_USERS.map((user) => {
-            const isSelected = currentUser.id === user.id;
+            const isSelected = currentUser?.id === user.id;
             const Icon = roleIcons[user.role];
 
             return (

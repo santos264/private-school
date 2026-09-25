@@ -12,6 +12,7 @@ import { ReportCardModal } from './components/modules/ReportCardModal';
 import { ReceiptModal } from './components/modules/ReceiptModal';
 
 // Dashboards
+import { SchoolDashboard } from './components/dashboard/SchoolDashboard';
 import { AdminDashboard } from './components/dashboard/AdminDashboard';
 import { TeacherDashboard } from './components/dashboard/TeacherDashboard';
 import { StudentDashboard } from './components/dashboard/StudentDashboard';
@@ -28,14 +29,26 @@ import { ReportCardsModule } from './components/modules/ReportCardsModule';
 import { FeesModule } from './components/modules/FeesModule';
 import { TimetableModule } from './components/modules/TimetableModule';
 import { NoticesModule } from './components/modules/NoticesModule';
+import { DatabaseModule } from './components/modules/DatabaseModule';
+import { LoginPortal } from './components/auth/LoginPortal';
 
 import { Menu, X } from 'lucide-react';
 
 const MainContent: React.FC = () => {
-  const { currentView, currentUser } = useSchool();
+  const { currentView, currentUser, isAuthenticated } = useSchool();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Dedicated Login Portal view (opened via the Header "Login" button)
+  if (currentView === 'login') {
+    return <LoginPortal />;
+  }
+
   const renderDashboardByRole = () => {
+    // Normal school dashboard is shown first when user has not logged in
+    if (!isAuthenticated) {
+      return <SchoolDashboard />;
+    }
+
     switch (currentUser.role) {
       case 'admin':
         return <AdminDashboard />;
@@ -48,7 +61,7 @@ const MainContent: React.FC = () => {
       case 'accountant':
         return <AccountantDashboard />;
       default:
-        return <AdminDashboard />;
+        return <SchoolDashboard />;
     }
   };
 
@@ -74,6 +87,8 @@ const MainContent: React.FC = () => {
         return <TimetableModule />;
       case 'notices':
         return <NoticesModule />;
+      case 'database':
+        return <DatabaseModule />;
       default:
         return renderDashboardByRole();
     }
@@ -93,8 +108,8 @@ const MainContent: React.FC = () => {
           {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           <span>{mobileMenuOpen ? 'Close Navigation' : 'Menu Navigation'}</span>
         </button>
-        <span className="text-xs text-slate-400 capitalize font-medium">
-          {currentUser.role} portal
+        <span className="text-xs text-slate-500 capitalize font-medium">
+          {isAuthenticated ? `${currentUser.role} portal` : 'School Portal'}
         </span>
       </div>
 

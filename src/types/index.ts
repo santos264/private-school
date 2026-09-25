@@ -9,6 +9,18 @@ export interface User {
   associatedId?: string; // studentId for student, teacherId for teacher, childStudentId for parent
   title?: string;
   phone?: string;
+  isChiefAdmin?: boolean; // For Chief Admin invite code generation
+  inviteCode?: string;
+}
+
+export interface AdminInviteCode {
+  code: string;
+  generatedBy: string;
+  createdAt: string;
+  roleAssigned: 'admin';
+  note?: string;
+  used?: boolean;
+  usedBy?: string;
 }
 
 export type ClassArm = 'Science' | 'Arts' | 'Commercial' | 'A' | 'B' | 'General';

@@ -14,7 +14,9 @@ import {
   School,
   ChevronRight,
   LogOut,
-  Building2
+  LogIn,
+  Building2,
+  Database
 } from 'lucide-react';
 
 interface NavItem {
@@ -25,10 +27,27 @@ interface NavItem {
 }
 
 export const Sidebar: React.FC = () => {
-  const { currentUser, currentView, setCurrentView, setIsRoleSwitcherOpen } = useSchool();
+  const { 
+    currentUser, 
+    isAuthenticated,
+    currentView, 
+    setCurrentView, 
+    setIsRoleSwitcherOpen, 
+    logout,
+    openLoginPortal 
+  } = useSchool();
 
   // Role-filtered navigation items
   const getNavItems = (): NavItem[] => {
+    if (!isAuthenticated) {
+      return [
+        { id: 'dashboard', label: 'School Overview', icon: LayoutDashboard },
+        { id: 'classes', label: 'Curriculum & Classes', icon: BookOpen },
+        { id: 'timetable', label: 'School Timetable', icon: Clock },
+        { id: 'notices', label: 'Announcements & News', icon: Megaphone },
+      ];
+    }
+
     switch (currentUser.role) {
       case 'admin':
         return [
@@ -42,6 +61,7 @@ export const Sidebar: React.FC = () => {
           { id: 'fees', label: 'School Fees & Bursary', icon: CreditCard },
           { id: 'timetable', label: 'Master Timetable', icon: Clock },
           { id: 'notices', label: 'Announcements', icon: Megaphone },
+          { id: 'database', label: 'Database & Records', icon: Database },
         ];
       case 'teacher':
         return [
@@ -93,21 +113,46 @@ export const Sidebar: React.FC = () => {
     <aside className="no-print w-64 border-r border-slate-200 bg-white flex flex-col shrink-0 min-h-[calc(100vh-4rem)]">
       {/* Role Indicator Bar */}
       <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-        <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-          <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-400">Current Role</span>
-          <button 
-            onClick={() => setIsRoleSwitcherOpen(true)}
-            className="text-indigo-600 hover:text-indigo-800 font-medium text-[11px]"
-          >
-            Switch
-          </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span className="text-sm font-semibold text-slate-800 capitalize truncate">
-            {currentUser.role === 'admin' ? 'Administrator' : currentUser.role}
-          </span>
-        </div>
+        {isAuthenticated ? (
+          <>
+            <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-400">Active Profile</span>
+              <button 
+                onClick={() => setIsRoleSwitcherOpen(true)}
+                className="text-indigo-600 hover:text-indigo-800 font-semibold text-[11px] cursor-pointer"
+              >
+                Switch
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-sm font-bold text-slate-800 capitalize truncate">
+                {currentUser.role === 'admin' ? 'Administrator' : currentUser.role}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 truncate mt-0.5">{currentUser.name}</p>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span className="font-semibold uppercase tracking-wider text-[10px] text-slate-400">College Portal</span>
+              <button 
+                onClick={() => openLoginPortal()}
+                className="text-indigo-600 hover:text-indigo-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
+              >
+                <span>Login</span>
+                <LogIn className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+              <span className="text-sm font-bold text-slate-800 truncate">
+                Public School Portal
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 truncate mt-0.5">St. Gregory Memorial College</p>
+          </>
+        )}
       </div>
 
       {/* Navigation Links */}
@@ -119,7 +164,7 @@ export const Sidebar: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setCurrentView(item.id)}
-              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors text-left ${
+              className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors text-left cursor-pointer ${
                 isActive
                   ? 'bg-slate-900 text-white shadow-sm'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -136,6 +181,44 @@ export const Sidebar: React.FC = () => {
           );
         })}
       </nav>
+
+      {/* Login Portal Access (Always accessible) */}
+      <div className="p-3 border-t border-slate-100 bg-indigo-50/40">
+        <button
+          onClick={() => openLoginPortal()}
+          className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-xl transition-all shadow-xs group cursor-pointer"
+          title="Open Login Portal for Staff & Students"
+        >
+          <div className="flex items-center gap-2.5">
+            <LogIn className="w-4 h-4 text-indigo-200 group-hover:text-white transition-colors" />
+            <span>Staff & Student Login</span>
+          </div>
+          <span className="text-[10px] bg-indigo-500 text-indigo-100 px-1.5 py-0.5 rounded font-medium">
+            Portal
+          </span>
+        </button>
+      </div>
+
+      {/* Logout / Exit Portal Action (shown when logged in) */}
+      {isAuthenticated && (
+        <div className="p-3 border-t border-slate-100">
+          <button
+            onClick={() => {
+              logout();
+              setCurrentView('dashboard');
+            }}
+            className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50/80 hover:bg-rose-100 rounded-lg transition-colors border border-rose-200/80 cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <LogOut className="w-4 h-4 text-rose-600" />
+              <span>Log Out & Return</span>
+            </div>
+            <span className="text-[10px] bg-rose-200 text-rose-800 px-1.5 py-0.5 rounded font-medium">
+              Exit
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* School Footer Info */}
       <div className="p-4 border-t border-slate-100 bg-slate-50/50">

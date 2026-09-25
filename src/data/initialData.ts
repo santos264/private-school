@@ -707,14 +707,34 @@ export const INITIAL_ANNOUNCEMENTS: Announcement[] = [
   },
 ];
 
+export const INITIAL_ADMIN_INVITE_CODES = [
+  {
+    code: 'ADMIN-CHIEF-2026-X9',
+    generatedBy: 'Dr. Patricia Okon',
+    createdAt: '2026-09-20',
+    roleAssigned: 'admin' as const,
+    note: 'Vice Principal Academic Admin Invitation',
+    used: false,
+  },
+  {
+    code: 'ADMIN-SECD-7741-K2',
+    generatedBy: 'Dr. Patricia Okon',
+    createdAt: '2026-09-22',
+    roleAssigned: 'admin' as const,
+    note: 'Dean of Student Affairs Access Pass',
+    used: false,
+  }
+];
+
 export const DEMO_USERS: User[] = [
   {
     id: 'usr-admin-01',
     name: 'Dr. Patricia Okon',
     email: 'principal@stgregorycollege.edu.ng',
     role: 'admin',
+    isChiefAdmin: true,
     avatarUrl: '/src/assets/images/school_principal_portrait_1790316617999.jpg',
-    title: 'Principal & Head of School',
+    title: 'Principal & Chief Administrator',
     phone: '+234 803 456 7890',
   },
   {

@@ -14,6 +14,7 @@ import {
   PaymentTransaction,
   TimetableSlot,
   Announcement,
+  AdminInviteCode,
 } from '../types';
 import {
   INITIAL_SETTINGS,
@@ -27,6 +28,7 @@ import {
   INITIAL_FEES,
   INITIAL_TIMETABLE,
   INITIAL_ANNOUNCEMENTS,
+  INITIAL_ADMIN_INVITE_CODES,
   DEMO_USERS,
 } from '../data/initialData';
 
@@ -41,10 +43,13 @@ export type NavigationModule =
   | 'fees' 
   | 'timetable' 
   | 'notices' 
-  | 'settings';
+  | 'settings'
+  | 'database'
+  | 'login';
 
 interface SchoolContextType {
   currentUser: User;
+  isAuthenticated: boolean;
   settings: SchoolSettings;
   classes: SchoolClass[];
   subjects: Subject[];
@@ -57,6 +62,9 @@ interface SchoolContextType {
   timetable: TimetableSlot[];
   announcements: Announcement[];
   currentView: NavigationModule;
+  adminInviteCodes: AdminInviteCode[];
+  targetAuthRole?: UserRole;
+  openLoginPortal: (role?: UserRole) => void;
   
   // Modals state
   selectedReportCardStudentId: string | null;
@@ -64,6 +72,13 @@ interface SchoolContextType {
   isRoleSwitcherOpen: boolean;
   isAuthModalOpen: boolean;
   
+  // Auth Action handlers
+  loginAsUser: (user: User) => void;
+  loginWithCredentials: (role: UserRole, identifier: string, passwordOrCode?: string) => { success: boolean; message: string };
+  logout: () => void;
+  generateAdminInviteCode: (note?: string, roleAssigned?: 'admin', expiresInDays?: number) => AdminInviteCode;
+  revokeAdminInviteCode: (code: string) => void;
+
   // Action handlers
   setCurrentView: (view: NavigationModule) => void;
   switchRole: (role: UserRole) => void;
@@ -126,6 +141,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [settings, setSettings] = useState<SchoolSettings>(() => loadState('settings', INITIAL_SETTINGS));
   const [currentUser, setCurrentUser] = useState<User>(() => loadState('currentUser', DEMO_USERS[0]));
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => loadState<boolean>('isAuthenticated', false));
+  const [adminInviteCodes, setAdminInviteCodes] = useState<AdminInviteCode[]>(() => loadState('adminInviteCodes', INITIAL_ADMIN_INVITE_CODES));
   const [classes, setClasses] = useState<SchoolClass[]>(() => loadState('classes', INITIAL_CLASSES));
   const [subjects, setSubjects] = useState<Subject[]>(() => loadState('subjects', INITIAL_SUBJECTS));
   const [teachers, setTeachers] = useState<Teacher[]>(() => loadState('teachers', INITIAL_TEACHERS));
@@ -138,14 +155,24 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => loadState('announcements', INITIAL_ANNOUNCEMENTS));
 
   const [currentView, setCurrentView] = useState<NavigationModule>('dashboard');
+  const [targetAuthRole, setTargetAuthRole] = useState<UserRole>('student');
   const [selectedReportCardStudentId, setSelectedReportCardStudentId] = useState<string | null>(null);
   const [selectedReceiptData, setSelectedReceiptData] = useState<{ fee: StudentFeeLedger; transaction: PaymentTransaction; student: Student } | null>(null);
   const [isRoleSwitcherOpen, setIsRoleSwitcherOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
+  const openLoginPortal = (role?: UserRole) => {
+    if (role) {
+      setTargetAuthRole(role);
+    }
+    setCurrentView('login');
+  };
+
   // Sync to local storage
   useEffect(() => saveState('settings', settings), [settings]);
   useEffect(() => saveState('currentUser', currentUser), [currentUser]);
+  useEffect(() => saveState('isAuthenticated', isAuthenticated), [isAuthenticated]);
+  useEffect(() => saveState('adminInviteCodes', adminInviteCodes), [adminInviteCodes]);
   useEffect(() => saveState('classes', classes), [classes]);
   useEffect(() => saveState('subjects', subjects), [subjects]);
   useEffect(() => saveState('teachers', teachers), [teachers]);
@@ -156,9 +183,193 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => saveState('fees', fees), [fees]);
   useEffect(() => saveState('announcements', announcements), [announcements]);
 
+  const loginAsUser = (user: User) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setCurrentView('dashboard');
+    setIsAuthModalOpen(false);
+  };
+
+  const loginWithCredentials = (
+    role: UserRole, 
+    identifier: string, 
+    passwordOrCode?: string
+  ): { success: boolean; message: string } => {
+    const cleanId = identifier.trim().toLowerCase();
+
+    // 1. Admin Login (Requires Chief Admin credentials OR valid Admin Invite Code)
+    if (role === 'admin') {
+      const inputCode = (passwordOrCode || '').trim();
+      
+      // Chief Admin direct login
+      const chiefAdmin = DEMO_USERS.find(u => u.role === 'admin');
+      if (cleanId === chiefAdmin?.email.toLowerCase() || cleanId === 'principal' || cleanId === 'admin') {
+        if (inputCode === 'admin123' || inputCode === '' || inputCode === 'CHIEF2026') {
+          loginAsUser(chiefAdmin!);
+          return { success: true, message: `Welcome Chief Administrator, ${chiefAdmin!.name}!` };
+        }
+      }
+
+      // Check if candidate is using a valid Admin Invite Code issued by the Chief Admin
+      const validInvite = adminInviteCodes.find(
+        inv => inv.code.toUpperCase() === inputCode.toUpperCase()
+      );
+
+      if (validInvite) {
+        const newAdminUser: User = {
+          id: `usr-admin-${Date.now().toString().slice(-4)}`,
+          name: identifier.includes('@') ? identifier.split('@')[0].replace('.', ' ').toUpperCase() : `Administrator (${identifier})`,
+          email: identifier.includes('@') ? identifier : `${cleanId}@stgregorycollege.edu.ng`,
+          role: 'admin',
+          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+          title: validInvite.note || 'Appointed Administrative Officer',
+          phone: '+234 800 000 1122',
+          isChiefAdmin: false,
+          inviteCode: validInvite.code,
+        };
+
+        // Mark invite code as used
+        setAdminInviteCodes(prev =>
+          prev.map(c => (c.code === validInvite.code ? { ...c, used: true, usedBy: newAdminUser.name } : c))
+        );
+
+        loginAsUser(newAdminUser);
+        return { success: true, message: `Admin Invitation Verified! Welcome, ${newAdminUser.name}.` };
+      }
+
+      // Direct fallback to demo admin if entered demo principal credentials
+      if (cleanId === 'principal@stgregorycollege.edu.ng' || cleanId === 'dr. patricia okon') {
+        loginAsUser(chiefAdmin!);
+        return { success: true, message: `Welcome, ${chiefAdmin!.name}!` };
+      }
+
+      return {
+        success: false,
+        message: 'Invalid Admin Credentials or Invite Code. Please enter the Chief Admin verification code.',
+      };
+    }
+
+    // 2. Teacher / Staff Login (Staff ID or Email)
+    if (role === 'teacher') {
+      const teacher = teachers.find(
+        t => t.staffId.toLowerCase() === cleanId || t.email.toLowerCase() === cleanId || `${t.firstName} ${t.lastName}`.toLowerCase().includes(cleanId)
+      );
+
+      if (teacher) {
+        const userObj: User = {
+          id: `usr-${teacher.id}`,
+          name: `${teacher.firstName} ${teacher.lastName}`,
+          email: teacher.email,
+          role: 'teacher',
+          avatarUrl: teacher.photoUrl,
+          associatedId: teacher.id,
+          title: teacher.qualification,
+          phone: teacher.phone,
+        };
+        loginAsUser(userObj);
+        return { success: true, message: `Welcome, ${userObj.name}!` };
+      }
+
+      // Fallback to demo teacher
+      const demoTeacher = DEMO_USERS.find(u => u.role === 'teacher')!;
+      loginAsUser(demoTeacher);
+      return { success: true, message: `Logged in as Academic Staff: ${demoTeacher.name}` };
+    }
+
+    // 3. Student Login (Admission No or Email/Name)
+    if (role === 'student') {
+      const student = students.find(
+        s => s.admissionNo.toLowerCase() === cleanId || `${s.firstName} ${s.lastName}`.toLowerCase().includes(cleanId) || s.firstName.toLowerCase() === cleanId
+      );
+
+      if (student) {
+        const studentClass = classes.find(c => c.id === student.classId);
+        const userObj: User = {
+          id: `usr-${student.id}`,
+          name: `${student.firstName} ${student.lastName}`,
+          email: `${student.firstName.toLowerCase()}.${student.lastName.toLowerCase()}@student.stgregorycollege.edu.ng`,
+          role: 'student',
+          avatarUrl: student.photoUrl,
+          associatedId: student.id,
+          title: `${studentClass?.name || 'Secondary Student'} (${student.admissionNo})`,
+          phone: student.guardianPhone,
+        };
+        loginAsUser(userObj);
+        return { success: true, message: `Welcome, ${userObj.name}!` };
+      }
+
+      const demoStudent = DEMO_USERS.find(u => u.role === 'student')!;
+      loginAsUser(demoStudent);
+      return { success: true, message: `Logged in as Student: ${demoStudent.name}` };
+    }
+
+    // 4. Parent Login (Ward Admission No, Phone, or Email)
+    if (role === 'parent') {
+      const student = students.find(
+        s => s.admissionNo.toLowerCase() === cleanId || s.guardianPhone.includes(cleanId) || s.guardianEmail.toLowerCase() === cleanId || s.guardianName.toLowerCase().includes(cleanId)
+      );
+
+      if (student) {
+        const userObj: User = {
+          id: `usr-parent-${student.id}`,
+          name: student.guardianName,
+          email: student.guardianEmail,
+          role: 'parent',
+          avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+          associatedId: student.id,
+          title: `Guardian of ${student.firstName} ${student.lastName} (${student.admissionNo})`,
+          phone: student.guardianPhone,
+        };
+        loginAsUser(userObj);
+        return { success: true, message: `Welcome, ${userObj.name}!` };
+      }
+
+      const demoParent = DEMO_USERS.find(u => u.role === 'parent')!;
+      loginAsUser(demoParent);
+      return { success: true, message: `Logged in as Guardian: ${demoParent.name}` };
+    }
+
+    // 5. Accountant / Bursar Login
+    if (role === 'accountant') {
+      const demoAccountant = DEMO_USERS.find(u => u.role === 'accountant')!;
+      loginAsUser(demoAccountant);
+      return { success: true, message: `Welcome Bursary Officer, ${demoAccountant.name}!` };
+    }
+
+    return { success: false, message: 'Invalid role or credentials' };
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    saveState('isAuthenticated', false);
+    setCurrentView('dashboard');
+  };
+
+  const generateAdminInviteCode = (note?: string, roleAssigned: 'admin' = 'admin', _expiresInDays = 30): AdminInviteCode => {
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const newCode = `ADMIN-${new Date().getFullYear()}-${randomSuffix}`;
+    
+    const newInvite: AdminInviteCode = {
+      code: newCode,
+      generatedBy: currentUser.name || 'Chief Administrator',
+      createdAt: new Date().toISOString().split('T')[0],
+      roleAssigned,
+      note: note || 'Executive Administrator Access Pass',
+      used: false,
+    };
+
+    setAdminInviteCodes(prev => [newInvite, ...prev]);
+    return newInvite;
+  };
+
+  const revokeAdminInviteCode = (codeToRevoke: string) => {
+    setAdminInviteCodes(prev => prev.filter(c => c.code !== codeToRevoke));
+  };
+
   const switchRole = (role: UserRole) => {
     const demoUser = DEMO_USERS.find(u => u.role === role) || DEMO_USERS[0];
     setCurrentUser(demoUser);
+    setIsAuthenticated(true);
     setCurrentView('dashboard');
     setIsRoleSwitcherOpen(false);
   };
@@ -468,6 +679,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <SchoolContext.Provider
       value={{
         currentUser,
+        isAuthenticated,
         settings,
         classes,
         subjects,
@@ -480,10 +692,18 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         timetable,
         announcements,
         currentView,
+        adminInviteCodes,
+        targetAuthRole,
+        openLoginPortal,
         selectedReportCardStudentId,
         selectedReceiptData,
         isRoleSwitcherOpen,
         isAuthModalOpen,
+        loginAsUser,
+        loginWithCredentials,
+        logout,
+        generateAdminInviteCode,
+        revokeAdminInviteCode,
         setCurrentView,
         switchRole,
         setCurrentUser,
